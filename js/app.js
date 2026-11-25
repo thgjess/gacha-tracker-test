@@ -1887,7 +1887,8 @@ function getEventDurationStats(startDate, endDate) {
 
   const durationDays = Math.max(1, Math.round((e - s) / (1000 * 60 * 60 * 24)) + 1);
   const daysLeft = Math.ceil((e - today) / (1000 * 60 * 60 * 24));
-  return { durationDays, daysLeft };
+  const daysUntilStart = Math.ceil((s - today) / (1000 * 60 * 60 * 24));
+  return { durationDays, daysLeft, daysUntilStart };
 }
 
 function renderActiveEvents() {
@@ -1903,11 +1904,24 @@ function renderActiveEvents() {
     return;
   }
 
-  grid.innerHTML = profile.activeEvents.map(ev => {
+  // Events that haven't started yet go to the bottom (soonest first); the rest keep their original order.
+  const sortedEvents = profile.activeEvents
+    .map((ev, idx) => ({ ev, idx, until: getEventDurationStats(ev.startDate, ev.endDate).daysUntilStart }))
+    .sort((a, b) => {
+      const aUp = a.until > 0;
+      const bUp = b.until > 0;
+      if (aUp !== bUp) return aUp ? 1 : -1;
+      if (aUp && bUp && a.until !== b.until) return a.until - b.until;
+      return a.idx - b.idx;
+    })
+    .map(x => x.ev);
+
+  grid.innerHTML = sortedEvents.map(ev => {
     const rewards = getEventRewards(ev);
     const totalSum = rewards.reduce((s, r) => s + r.total, 0);
     const isComplete = rewards.length > 0 && rewards.every(r => r.claimed >= r.total && r.total > 0);
-    const { durationDays, daysLeft } = getEventDurationStats(ev.startDate, ev.endDate);
+    const { durationDays, daysLeft, daysUntilStart } = getEventDurationStats(ev.startDate, ev.endDate);
+    const isUpcoming = daysUntilStart > 0;
     const posX = ev.imagePosX ?? 50;
     const posY = ev.imagePosY ?? 35;
     const zoomScale = ((ev.imageZoom ?? 100) / 100).toFixed(2);
@@ -1918,7 +1932,9 @@ function renderActiveEvents() {
       : '';
 
     let timeBadge = '';
-    if (daysLeft > 0) {
+    if (isUpcoming) {
+      timeBadge = `<span class="text-[11px] font-mono text-sky-300 bg-slate-950/75 px-2 py-0.5 rounded-md border border-sky-400/25">Starts in ${daysUntilStart}d</span>`;
+    } else if (daysLeft > 0) {
       timeBadge = `<span class="text-[11px] font-mono text-amber-300 bg-slate-950/75 px-2 py-0.5 rounded-md border border-amber-400/25">${daysLeft}d left</span>`;
     } else if (daysLeft === 0) {
       timeBadge = `<span class="text-[11px] font-mono text-rose-300 font-bold bg-rose-950/80 px-2 py-0.5 rounded-md border border-rose-400/30">Ends today</span>`;
@@ -1982,7 +1998,7 @@ function renderActiveEvents() {
     }).join('');
 
     return `
-      <div class="glass-card rounded-2xl overflow-hidden flex flex-col justify-between ${isComplete ? 'border-emerald-500/40' : ''}">
+      <div class="glass-card rounded-2xl overflow-hidden flex flex-col justify-between ${isComplete ? 'border-emerald-500/40' : ''} ${isUpcoming ? 'opacity-60 hover:opacity-100 transition-opacity duration-200' : ''}">
         <div>
           ${bannerSection}
           <div class="p-4 ${ev.image ? 'pt-1' : 'pt-3'}">
