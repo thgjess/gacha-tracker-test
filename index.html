@@ -1,0 +1,1050 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Gacha Tracker</title>
+  <link rel="icon" type="image/png" href="assets/icon.png" />
+  <link rel="apple-touch-icon" href="assets/icon.png" />
+  <!-- Google Fonts: Inter & JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Chart.js for Mountain Graph -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+
+  <script src="js/tailwind-config.js"></script>
+
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body class="antialiased pb-16">
+
+  <!-- Toast Notification Banner -->
+  <div id="toast-container" class="fixed bottom-5 right-5 z-[70] flex flex-col gap-2 pointer-events-none"></div>
+
+  <!-- Sample Data Banner -->
+  <div id="sample-banner" class="hidden bg-gradient-to-r from-amber-500/20 via-teal-500/20 to-purple-500/20 border-b border-amber-400/30 px-4 py-2 text-xs sm:text-sm">
+    <div class="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-3">
+      <div class="flex items-center gap-2 text-amber-200">
+        <i class="fa-solid fa-sparkles text-amber-400"></i>
+        <span><strong>Preview Mode:</strong> Sample data loaded for both <strong>Wuthering Waves</strong> &amp; <strong>Neverness to Everness</strong> so you can test every feature immediately.</span>
+      </div>
+      <button onclick="clearSampleData()" class="px-3 py-1 rounded-lg bg-rose-500/20 hover:bg-rose-500/35 border border-rose-400/40 text-rose-200 font-semibold transition cursor-pointer">
+        <i class="fa-solid fa-eraser mr-1"></i> Clear Sample Data (Start Fresh)
+      </button>
+    </div>
+  </div>
+
+  <div id="hero-editor-modal" class="hidden fixed inset-0 z-[90] flex items-center justify-center p-4 bg-slate-950/75 backdrop-blur-md" onclick="if(event.target===this) closeHeroEditorModal()">
+  <div class="w-full max-w-lg rounded-2xl bg-slate-950 border accent-border shadow-2xl p-5 space-y-4 text-xs" onclick="event.stopPropagation()">
+    <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+      <span class="font-bold text-sm text-white flex items-center gap-2">
+        <i class="fa-solid fa-crop-simple accent-text"></i> Customize Showcase Banner
+      </span>
+      <button type="button" onclick="closeHeroEditorModal()" class="w-7 h-7 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-white flex items-center justify-center cursor-pointer">
+        <i class="fa-solid fa-xmark"></i>
+      </button>
+    </div>
+
+    <!-- Interactive Drag Preview Viewport -->
+    <div id="hero-modal-preview" class="relative w-full h-40 rounded-xl overflow-hidden bg-slate-900 border border-slate-800 cursor-grab active:cursor-grabbing select-none touch-none">
+      <img id="hero-modal-preview-img" src="" alt="Banner Preview" draggable="false" class="w-full h-full object-cover pointer-events-none transition-none" />
+      <div class="absolute bottom-2 left-2 px-2 py-0.5 rounded bg-black/70 text-[10px] text-slate-300 pointer-events-none">
+        <i class="fa-solid fa-up-down-left-right mr-1 accent-text"></i> Drag inside preview to reposition
+      </div>
+    </div>
+
+    <!-- Position X / Y Fine Sliders + Zoom + Height -->
+    <div class="grid grid-cols-2 gap-3">
+      <div>
+        <div class="flex justify-between text-[11px] text-slate-400 mb-1">
+          <span>Horizontal (X)</span><span id="hero-pos-x-val" class="font-mono accent-text">50%</span>
+        </div>
+        <input id="hero-pos-x-slider" type="range" min="0" max="100" value="50" oninput="updateHeroFromSliders()" class="w-full accent-teal-400 cursor-pointer" />
+      </div>
+      <div>
+        <div class="flex justify-between text-[11px] text-slate-400 mb-1">
+          <span>Vertical (Y)</span><span id="hero-pos-y-val" class="font-mono accent-text">25%</span>
+        </div>
+        <input id="hero-pos-y-slider" type="range" min="0" max="100" value="25" oninput="updateHeroFromSliders()" class="w-full accent-teal-400 cursor-pointer" />
+      </div>
+    </div>
+
+    <div class="space-y-1">
+      <div class="flex justify-between text-[11px] text-slate-400">
+        <span>Zoom Scale</span><span id="hero-zoom-val" class="font-mono accent-text">100%</span>
+      </div>
+      <input id="hero-zoom-slider" type="range" min="100" max="220" value="100" oninput="updateHeroFromSliders()" class="w-full accent-teal-400 cursor-pointer" />
+    </div>
+
+    <div class="flex items-center justify-between gap-2 pt-1">
+      <span class="text-[11px] text-slate-400">Banner Height:</span>
+      <div class="inline-flex rounded-lg bg-slate-900 p-0.5 border border-slate-800">
+        <button type="button" onclick="setHeroBannerSize('sm')" id="hero-sz-sm" class="hero-sz-btn px-2.5 py-1 rounded text-[11px] font-semibold text-slate-400 cursor-pointer">Compact</button>
+        <button type="button" onclick="setHeroBannerSize('md')" id="hero-sz-md" class="hero-sz-btn px-2.5 py-1 rounded text-[11px] font-semibold accent-bg-soft accent-text cursor-pointer">Standard</button>
+        <button type="button" onclick="setHeroBannerSize('lg')" id="hero-sz-lg" class="hero-sz-btn px-2.5 py-1 rounded text-[11px] font-semibold text-slate-400 cursor-pointer">Tall</button>
+      </div>
+    </div>
+
+    <div class="pt-3 border-t border-slate-800 flex items-center gap-2">
+      <label class="flex-1 py-2 px-3 rounded-xl accent-bg-soft border text-center font-bold accent-text cursor-pointer hover:opacity-90 transition">
+        <i class="fa-solid fa-upload mr-1"></i> Upload Image
+        <input type="file" accept="image/*" class="hidden" onchange="handleHeroImageUpload(event)" />
+      </label>
+      <button type="button" onclick="resetHeroFraming()" class="py-2 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold cursor-pointer">Reset</button>
+      <button type="button" onclick="removeHeroImage()" class="py-2 px-3 rounded-xl bg-rose-950/85 hover:bg-rose-900 border border-rose-500/35 text-rose-200 font-semibold cursor-pointer">
+        <i class="fa-solid fa-trash"></i>
+      </button>
+    </div>
+  </div>
+</div>
+
+  <!-- Main Wrapper -->
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-5 space-y-5">
+
+    <!-- 0. TOP GAME SWITCHER & GLOBAL STUDIO BAR -->
+    <nav class="glass-panel rounded-2xl p-2.5 sm:px-4 flex flex-wrap items-center justify-between gap-3">
+      <!-- Game Switcher Pills -->
+      <div class="flex items-center gap-2 flex-wrap">
+        <button onclick="switchGame('wuwa')" id="game-btn-wuwa" class="px-3.5 py-2 rounded-xl text-xs sm:text-sm font-extrabold transition cursor-pointer flex items-center gap-2 border">
+          <span class="w-2.5 h-2.5 rounded-full bg-teal-400 shadow-[0_0_8px_#2dd4bf]"></span>
+          <span>Wuthering Waves</span>
+          <span class="hidden md:inline text-[10px] font-mono opacity-75 px-1.5 py-0.5 rounded bg-black/25">ASTRITE</span>
+        </button>
+
+        <button onclick="switchGame('nte')" id="game-btn-nte" class="px-3.5 py-2 rounded-xl text-xs sm:text-sm font-extrabold transition cursor-pointer flex items-center gap-2 border">
+          <span class="w-2.5 h-2.5 rounded-full bg-purple-400 shadow-[0_0_8px_#c084fc]"></span>
+          <span>Neverness to Everness</span>
+          <span class="hidden md:inline text-[10px] font-mono opacity-75 px-1.5 py-0.5 rounded bg-black/25">ANNULITH</span>
+        </button>
+      </div>
+
+      <!-- Right Studio & Backup Controls -->
+      <div class="flex items-center gap-2">
+        <span class="hidden xl:inline-flex items-center gap-1.5 text-[11px] font-mono text-slate-400 px-2.5 py-1 rounded-lg bg-slate-900/60 border border-slate-800">
+          <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span> Auto-saved locally
+        </span>
+
+        <button onclick="openCustomizeDrawer()" class="px-3.5 py-2 rounded-xl accent-bg-soft hover:opacity-90 border text-xs font-bold transition cursor-pointer flex items-center gap-1.5 accent-text">
+          <i class="fa-solid fa-palette"></i> Customize
+        </button>
+
+        <button onclick="exportJSON()" title="Export All Games & Images JSON Backup" class="px-3 py-2 rounded-xl bg-slate-800/90 hover:bg-slate-700 border border-slate-700 text-slate-200 text-xs font-semibold transition cursor-pointer flex items-center gap-1.5">
+          <i class="fa-solid fa-download"></i> <span class="hidden sm:inline">Export</span>
+        </button>
+
+        <label title="Import JSON Backup" class="px-3 py-2 rounded-xl bg-slate-800/90 hover:bg-slate-700 border border-slate-700 text-slate-200 text-xs font-semibold transition cursor-pointer flex items-center gap-1.5">
+          <i class="fa-solid fa-upload"></i> <span class="hidden sm:inline">Import</span>
+          <input type="file" id="import-json-input" accept=".json" class="hidden" onchange="importJSON(event)" />
+        </label>
+      </div>
+    </nav>
+
+    <!-- 1. GAME HERO SHOWCASE BANNER & ACTIVE PATCH HEADER -->
+    <header class="glass-panel rounded-2xl overflow-hidden relative">
+      <!-- Customizable Hero Showcase Banner -->
+      <div id="hero-banner-container"
+        ondragover="handleBannerDragOver(event)"
+        ondragleave="handleBannerDragLeave(event)"
+        ondrop="handleBannerDrop(event)"
+        class="relative w-full h-44 sm:h-56 md:h-64 bg-slate-950/40 overflow-hidden group transition-all duration-300">
+
+        <div id="hero-controls-wrapper" class="absolute top-3 right-3 z-30 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity duration-200">
+          <button type="button" onclick="openHeroEditorModal(event)" title="Customize Banner"
+            class="w-9 h-9 rounded-xl bg-slate-950/85 hover:bg-slate-900 backdrop-blur-md border border-white/15 text-slate-200 hover:text-white flex items-center justify-center shadow-lg cursor-pointer transition">
+            <i class="fa-solid fa-pen text-xs accent-text"></i>
+          </button>
+        </div>
+
+        <!-- Default or Uploaded Hero Image with smooth bottom fade-out -->
+        <img id="hero-banner-img" src="" alt="Game Showcase Banner" draggable="false"
+          class="hidden w-full h-full object-cover hero-banner-mask select-none"
+          style="object-position: 50% 25%; transform-origin: 50% 25%; transform: scale(1);" />
+
+        <!-- Fallback Stylized Geometric Backdrop when no image uploaded -->
+        <div id="hero-banner-fallback" class="w-full h-full flex flex-col items-center justify-center relative overflow-hidden hero-banner-mask">
+          <div class="absolute inset-0 opacity-30" style="background: radial-gradient(circle at 25% 30%, var(--accent), transparent 55%), radial-gradient(circle at 80% 70%, #f59e0b, transparent 50%);"></div>
+          <div class="relative z-10 text-center px-4">
+            <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-black/35 border border-white/10 text-[11px] font-mono text-slate-300 mb-2">
+              <i class="fa-regular fa-image accent-text"></i> Showcase Banner Slot
+            </div>
+            <p class="text-xs sm:text-sm text-slate-300 font-medium">Hover over this banner and click the pencil to upload &amp; customize art</p>
+            <p class="text-[11px] text-slate-400 mt-0.5">Or drag &amp; drop an image directly onto the banner</p>
+          </div>
+        </div>
+
+        <!-- Soft Scrim for Legibility -->
+        <div class="absolute inset-0 bg-gradient-to-t from-[var(--bg-base)] via-transparent to-transparent pointer-events-none"></div>
+
+        <!-- Drag-to-Reposition Indicator when Editor is Open -->
+        <div id="hero-drag-hint" class="hidden absolute top-3 left-3 z-20 px-2.5 py-1 rounded-lg bg-slate-950/85 backdrop-blur-md border accent-border text-[11px] text-slate-200 pointer-events-none">
+          <i class="fa-solid fa-up-down-left-right mr-1 accent-text"></i> Drag banner to adjust position
+        </div>
+
+        <!-- Overlaid Game Identity Title & Currency Badges at Bottom-Left of Banner -->
+        <div class="absolute bottom-3.5 left-4 sm:left-6 right-4 z-10 flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3 pointer-events-none">
+          <div class="flex items-center gap-3.5 pointer-events-auto">
+            <!-- Clickable Primary Currency Icon Badge -->
+            <label title="Click to upload custom currency icon" class="relative w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-slate-950/80 backdrop-blur-md border accent-border flex items-center justify-center shrink-0 cursor-pointer group/icon shadow-xl overflow-hidden">
+              <div id="hero-currency-icon-slot" class="w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center"></div>
+              <div class="absolute inset-0 bg-black/70 opacity-0 group-hover/icon:opacity-100 transition flex items-center justify-center text-[10px] font-bold text-white">
+                <i class="fa-solid fa-pen"></i>
+              </div>
+              <input type="file" accept="image/*" class="hidden" onchange="handleCustomIconUpload(event, 'currency')" />
+            </label>
+
+            <div>
+              <div class="flex flex-wrap items-center gap-2">
+                <span id="game-terminal-tag" class="text-[10px] sm:text-[11px] font-mono uppercase tracking-widest px-2 py-0.5 rounded-md accent-bg-soft border accent-text font-bold">
+                  SOLARIS-3 TERMINAL
+                </span>
+                <span id="patch-countdown-badge" class="text-[10px] sm:text-[11px] font-mono px-2.5 py-0.5 rounded-full bg-amber-400/20 text-amber-300 border border-amber-400/35">
+                  Calculating...
+                </span>
+              </div>
+              <h1 id="game-main-title" class="text-xl sm:text-2xl md:text-3xl font-extrabold tracking-tight text-white mt-0.5 drop-shadow">
+                WUTHERING WAVES
+              </h1>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Patch Controls & Quick Log Action Strip -->
+      <div class="p-4 sm:px-6 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+        <!-- Editable Active Patch Info -->
+        <div class="flex flex-wrap items-center gap-2.5 bg-slate-900/80 border border-slate-800 rounded-xl px-3 py-2">
+          <div class="flex items-center gap-1.5">
+            <label for="patch-version-input" class="text-[11px] uppercase tracking-wider text-slate-400 font-semibold">Patch</label>
+            <input id="patch-version-input" type="text" value="Patch 3.8" onchange="updatePatchMeta()"
+              class="w-24 sm:w-28 bg-slate-800/90 border accent-border rounded-lg px-2 py-1 text-xs font-mono font-bold accent-text focus:outline-none" />
+          </div>
+          <div class="hidden sm:block h-4 w-[1px] bg-slate-700"></div>
+          <div class="flex items-center gap-1.5 text-xs">
+            <input id="patch-start-input" type="date" onchange="updatePatchMeta()"
+              class="bg-slate-800/90 border border-slate-700 rounded-lg px-2 py-1 text-xs font-mono text-slate-200 focus:outline-none" title="Patch Start Date" />
+            <span class="text-slate-500">→</span>
+            <input id="patch-end-input" type="date" onchange="updatePatchMeta()"
+              class="bg-slate-800/90 border border-slate-700 rounded-lg px-2 py-1 text-xs font-mono text-slate-200 focus:outline-none" title="Patch End Date" />
+          </div>
+        </div>
+
+        <!-- Primary Action Buttons -->
+        <div class="flex flex-wrap items-center gap-2.5">
+          <button onclick="openDailyModal()" class="px-4 py-2.5 rounded-xl accent-bg hover:opacity-90 text-slate-950 font-extrabold text-xs sm:text-sm shadow-lg transition cursor-pointer flex items-center gap-2">
+            <i class="fa-solid fa-plus"></i>
+            <span id="btn-log-daily-label">Log Daily Astrite</span>
+          </button>
+          <button onclick="openEventModal()" class="px-4 py-2.5 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 border border-amber-400/40 text-amber-200 font-semibold text-xs sm:text-sm transition cursor-pointer flex items-center gap-2">
+            <i class="fa-solid fa-calendar-plus text-amber-400"></i> Add Event
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <!-- 2. KPI SUMMARY CARDS -->
+    <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <!-- KPI 1: Primary Currency Stash -->
+      <div class="glass-card density-pad rounded-2xl p-5 relative overflow-hidden">
+        <div class="flex items-center justify-between">
+          <span id="kpi-currency-title" class="text-xs font-semibold uppercase tracking-wider text-slate-400">Current Astrite Stash</span>
+          <label title="Click to upload custom currency icon" class="w-9 h-9 rounded-xl accent-bg-soft border flex items-center justify-center cursor-pointer overflow-hidden hover:scale-105 transition">
+            <div id="kpi-currency-icon-slot" class="w-6 h-6 flex items-center justify-center"></div>
+            <input type="file" accept="image/*" class="hidden" onchange="handleCustomIconUpload(event, 'currency')" />
+          </label>
+        </div>
+        <div class="mt-3 flex items-baseline gap-2">
+          <span id="kpi-astrite" class="text-3xl font-extrabold font-mono accent-glow">0</span>
+          <span id="kpi-currency-unit" class="text-xs text-slate-400 font-medium">Astrite</span>
+        </div>
+        <div class="mt-2 flex items-center justify-between text-xs">
+          <span id="kpi-astrite-pulls" class="text-slate-300 font-mono">0.0 pulls raw</span>
+          <span id="kpi-last-delta" class="font-mono px-2 py-0.5 rounded bg-slate-800 text-slate-400">--</span>
+        </div>
+      </div>
+
+      <!-- KPI 2: Total Limited Character Pulls -->
+      <div class="glass-card density-pad rounded-2xl p-5 relative overflow-hidden">
+        <div class="flex items-center justify-between">
+          <span id="kpi-pulls-title" class="text-xs font-semibold uppercase tracking-wider text-slate-400">Total Limited Pulls</span>
+          <label title="Click to upload custom limited pull icon" class="w-9 h-9 rounded-xl bg-amber-400/15 border border-amber-400/35 flex items-center justify-center cursor-pointer overflow-hidden hover:scale-105 transition">
+            <div id="kpi-ticket-icon-slot" class="w-6 h-6 flex items-center justify-center"></div>
+            <input type="file" accept="image/*" class="hidden" onchange="handleCustomIconUpload(event, 'limitedTicket')" />
+          </label>
+        </div>
+        <div class="mt-3 flex items-baseline gap-2">
+          <span id="kpi-total-pulls" class="text-3xl font-extrabold font-mono text-amber-300">0</span>
+          <span id="kpi-pulls-unit" class="text-xs text-slate-400 font-medium">Convenes</span>
+        </div>
+        <div class="mt-2 flex items-center justify-between gap-2 text-xs text-slate-400 font-mono">
+          <span id="kpi-radiant-tides" class="inline-flex items-center gap-1.5 text-slate-200 truncate">0 Radiant Tides</span>
+          <span id="kpi-other-tides" class="inline-flex items-center gap-2 shrink-0">0 Forging / 0 Lustrous</span>
+        </div>
+      </div>
+
+      <!-- KPI 3: Active Patch Event Progress -->
+      <div class="glass-card density-pad rounded-2xl p-5 relative overflow-hidden">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-semibold uppercase tracking-wider text-slate-400">Active Patch Events</span>
+          <span class="w-9 h-9 rounded-xl bg-cyan-400/15 border border-cyan-400/30 flex items-center justify-center text-cyan-300">
+            <i class="fa-solid fa-flag-checkered"></i>
+          </span>
+        </div>
+        <div class="mt-3 flex items-baseline justify-between">
+          <div>
+            <span id="kpi-event-claimed" class="text-2xl font-extrabold font-mono text-white">0</span>
+            <span id="kpi-event-total" class="text-xs font-mono text-slate-400">/ 0</span>
+          </div>
+          <span id="kpi-event-pct" class="text-xs font-mono font-bold accent-text">0%</span>
+        </div>
+        <div class="w-full h-2 bg-slate-800 rounded-full overflow-hidden mt-2.5">
+          <div id="kpi-event-bar" class="h-full accent-bg rounded-full transition-all duration-500" style="width: 0%"></div>
+        </div>
+        <div class="mt-1.5 text-[11px] text-slate-400 flex justify-between">
+          <span id="kpi-event-remaining">0 left to claim</span>
+          <span id="kpi-event-count">0 events</span>
+        </div>
+      </div>
+
+      <!-- KPI 4: Daily Velocity & Lifetime Event Vault -->
+      <div class="glass-card density-pad rounded-2xl p-5 relative overflow-hidden">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-semibold uppercase tracking-wider text-slate-400">Income Velocity &amp; Vault</span>
+          <span class="w-9 h-9 rounded-xl bg-purple-400/15 border border-purple-400/30 flex items-center justify-center text-purple-300">
+            <i class="fa-solid fa-chart-line"></i>
+          </span>
+        </div>
+        <div class="mt-3 flex items-baseline gap-2">
+          <span id="kpi-avg-daily" class="text-2xl font-extrabold font-mono text-emerald-300">+0</span>
+          <span id="kpi-avg-unit" class="text-xs text-slate-400">Astrite / day avg</span>
+        </div>
+        <div class="mt-2 pt-2 border-t border-slate-800/80 flex items-center justify-between text-xs">
+          <span class="text-slate-400">Lifetime Event Earned:</span>
+          <span id="kpi-lifetime-events" class="font-mono font-bold text-amber-300">0</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- 3. INTERACTIVE MOUNTAIN GRAPH (AREA CHART) -->
+    <section class="glass-panel rounded-2xl p-5 sm:p-6">
+      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+        <div>
+          <h2 id="chart-heading" class="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+            <i class="fa-solid fa-mountain accent-text"></i>
+            <span>Astrite Accumulation Mountain Graph</span>
+          </h2>
+          <p class="text-xs text-slate-400">Cumulative stash trajectory over time (hover points for net daily delta &amp; pull value)</p>
+        </div>
+        <!-- Filter Pills -->
+        <div class="inline-flex rounded-xl bg-slate-900/90 p-1 border border-slate-800 self-start">
+          <button onclick="setChartFilter('all')" id="filter-all" class="chart-filter-btn px-3 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer accent-bg-soft accent-text border">
+            All Time
+          </button>
+          <button onclick="setChartFilter('patch')" id="filter-patch" class="chart-filter-btn px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-400 hover:text-white transition cursor-pointer">
+            Current Patch
+          </button>
+          <button onclick="setChartFilter('14d')" id="filter-14d" class="chart-filter-btn px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-400 hover:text-white transition cursor-pointer">
+            Last 14 Days
+          </button>
+        </div>
+      </div>
+
+      <div class="relative w-full h-64 sm:h-80">
+        <canvas id="astriteMountainChart"></canvas>
+      </div>
+    </section>
+
+    <!-- NAVIGATION TABS FOR WORKSPACE SECTIONS -->
+    <div class="flex flex-wrap items-center gap-2 border-b border-slate-800 pb-3">
+      <button onclick="switchMainTab('events')" id="tab-btn-events" class="main-tab-btn px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition cursor-pointer accent-bg-soft accent-text border flex items-center gap-2">
+        <i class="fa-solid fa-calendar-check"></i> Patch Events &amp; Vault
+        <span id="badge-active-events" class="px-1.5 py-0.5 text-[11px] font-mono rounded bg-black/25">0</span>
+      </button>
+      <button onclick="switchMainTab('daily')" id="tab-btn-daily" class="main-tab-btn px-4 py-2 rounded-xl text-xs sm:text-sm font-bold text-slate-400 hover:text-white bg-slate-900/60 border border-slate-800 transition cursor-pointer flex items-center gap-2">
+        <i class="fa-solid fa-list-ol"></i> Daily Balance Log
+        <span id="badge-daily-logs" class="px-1.5 py-0.5 text-[11px] font-mono rounded bg-slate-800 text-slate-300">0</span>
+      </button>
+      <button onclick="switchMainTab('pity')" id="tab-btn-pity" class="main-tab-btn px-4 py-2 rounded-xl text-xs sm:text-sm font-bold text-slate-400 hover:text-white bg-slate-900/60 border border-slate-800 transition cursor-pointer flex items-center gap-2">
+        <i class="fa-solid fa-compass"></i> Pity Planner &amp; Economy Guide
+      </button>
+    </div>
+
+    <!-- TAB 1: PATCH EVENTS & PERMANENT ARCHIVE VAULT -->
+    <section id="tab-panel-events" class="space-y-6">
+      <div class="glass-panel rounded-2xl p-5 sm:p-6">
+        <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 pb-5 border-b border-slate-800">
+          <div>
+            <div class="flex items-center gap-2">
+              <h3 class="text-lg font-bold text-white">Active Patch Events</h3>
+              <span id="active-patch-pill" class="text-xs font-mono px-2.5 py-0.5 rounded-full accent-bg-soft accent-text border">Patch 3.8</span>
+            </div>
+            <p class="text-xs text-slate-400 mt-1">Upload event banner images, log claimed rewards manually, or archive events into your permanent vault when a new patch drops.</p>
+          </div>
+          <div class="flex flex-wrap items-center gap-2.5">
+            <button onclick="openEventModal()" class="px-3.5 py-2 rounded-xl accent-bg hover:opacity-90 text-slate-950 font-bold text-xs transition cursor-pointer flex items-center gap-1.5">
+              <i class="fa-solid fa-plus"></i> Add Event
+            </button>
+            <button onclick="openArchiveConfirmModal()" class="px-3.5 py-2 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 border border-amber-400/40 text-amber-200 font-semibold text-xs transition cursor-pointer flex items-center gap-1.5">
+              <i class="fa-solid fa-box-archive text-amber-400"></i> Archive &amp; Reset Patch
+            </button>
+          </div>
+        </div>
+
+        <!-- Active Events Grid -->
+        <div id="active-events-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mt-5"></div>
+      </div>
+
+      <!-- Permanent Event Archive Vault -->
+      <div class="glass-panel rounded-2xl p-5 sm:p-6">
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+          <div>
+            <h3 class="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+              <i class="fa-solid fa-vault text-amber-400"></i>
+              Permanent Event Archive Vault
+            </h3>
+            <p class="text-xs text-slate-400">Past patch events, images, and earned currency stay permanently saved here even after resetting active events.</p>
+          </div>
+          <div class="flex items-center gap-2">
+            <label for="archive-patch-filter" class="text-xs text-slate-400">Filter Patch:</label>
+            <select id="archive-patch-filter" onchange="renderArchiveTable()" class="bg-slate-900 border border-slate-700 rounded-xl px-3 py-1.5 text-xs font-mono text-slate-200 focus:outline-none">
+              <option value="ALL">All Archived Patches</option>
+            </select>
+          </div>
+        </div>
+
+        <div id="archive-category-pills" class="flex flex-wrap gap-2 mb-4"></div>
+
+        <div class="overflow-x-auto rounded-xl border border-slate-800">
+          <table class="w-full text-left border-collapse text-xs sm:text-sm">
+            <thead>
+              <tr class="bg-slate-900/90 text-slate-400 uppercase text-[11px] tracking-wider border-b border-slate-800">
+                <th class="py-3 px-4">Patch</th>
+                <th class="py-3 px-4">Event</th>
+                <th class="py-3 px-4">Category</th>
+                <th class="py-3 px-4">Duration</th>
+                <th class="py-3 px-4 text-right">Claimed / Max</th>
+                <th class="py-3 px-4 text-right">Action</th>
+              </tr>
+            </thead>
+            <tbody id="archive-table-body" class="divide-y divide-slate-800/70"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 2: DAILY BALANCE LOG -->
+    <section id="tab-panel-daily" class="hidden space-y-4">
+      <div class="glass-panel rounded-2xl p-5 sm:p-6">
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+          <div>
+            <h3 id="daily-ledger-title" class="text-lg font-bold text-white">Daily Astrite &amp; Tide Ledger</h3>
+            <p class="text-xs text-slate-400">Track daily totals and pull items. Net daily gains/spending compute automatically.</p>
+          </div>
+          <button onclick="openDailyModal()" class="px-4 py-2 rounded-xl accent-bg hover:opacity-90 text-slate-950 font-bold text-xs transition cursor-pointer self-start sm:self-auto flex items-center gap-1.5">
+            <i class="fa-solid fa-plus"></i> Log Today's Balance
+          </button>
+        </div>
+
+        <div class="overflow-x-auto rounded-xl border border-slate-800">
+          <table class="w-full text-left border-collapse text-xs sm:text-sm">
+            <thead>
+              <tr class="bg-slate-900/90 text-slate-400 uppercase text-[11px] tracking-wider border-b border-slate-800">
+                <th class="py-3 px-4">Date</th>
+                <th class="py-3 px-4">Patch</th>
+                <th id="th-daily-currency" class="py-3 px-4 text-right">Total Astrite</th>
+                <th class="py-3 px-4 text-right">Daily Net</th>
+                <th id="th-daily-tickets" class="py-3 px-4 text-right">Tides (R / F / L)</th>
+                <th class="py-3 px-4 text-right">Total Limited Pulls</th>
+                <th class="py-3 px-4">Note</th>
+                <th class="py-3 px-4 text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="daily-table-body" class="divide-y divide-slate-800/70"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 3: BANNER PITY CALCULATOR & GAME ECONOMY REFERENCE -->
+    <section id="tab-panel-pity" class="hidden grid grid-cols-1 lg:grid-cols-12 gap-6">
+      <!-- Left 6 cols: Interactive Banner Guarantee & Pity Planner -->
+      <div class="lg:col-span-6 glass-panel rounded-2xl p-5 sm:p-6 space-y-5">
+        <div>
+          <span id="pity-sim-badge" class="text-[11px] font-mono uppercase tracking-wider px-2 py-0.5 rounded bg-amber-400/15 text-amber-300 border border-amber-400/30">Convene Simulator</span>
+          <h3 class="text-lg font-bold text-white mt-1.5">Banner Guarantee &amp; Pity Planner</h3>
+          <p id="pity-sim-subtitle" class="text-xs text-slate-400">Calculate exact currency needed for your next featured 5★ / S-Rank target.</p>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-xs font-semibold text-slate-300 mb-1">Target Character / Weapon</label>
+            <input id="pity-target-name" type="text" oninput="savePitySettings()"
+              class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none" />
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-300 mb-1">Banner Type</label>
+            <select id="pity-banner-type" onchange="savePitySettings()"
+              class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none">
+              <option value="character">Limited Character Banner</option>
+              <option value="weapon">Limited Weapon / Arc Banner</option>
+            </select>
+          </div>
+          <div>
+            <label id="pity-count-label" class="block text-xs font-semibold text-slate-300 mb-1">Current Pity Count (0–79)</label>
+            <input id="pity-current-count" type="number" min="0" max="89" oninput="savePitySettings()"
+              class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm font-mono accent-text focus:outline-none" />
+          </div>
+          <div id="pity-guarantee-wrapper">
+            <label class="block text-xs font-semibold text-slate-300 mb-1">50/50 Status</label>
+            <select id="pity-guaranteed" onchange="savePitySettings()"
+              class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none">
+              <option value="no">On 50/50 (Worst Case: 160 Pulls)</option>
+              <option value="yes">Guaranteed Next 5★ (Max: 80 Pulls)</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- NTE Special 100% Guarantee & Outfit Milestone Callout (Visible in NTE Mode) -->
+        <div id="nte-pity-callout" class="hidden rounded-xl bg-purple-500/10 border border-purple-400/30 p-3.5 text-xs space-y-2">
+          <div class="flex items-center justify-between">
+            <span class="font-bold text-purple-300"><i class="fa-solid fa-dice-d20 mr-1"></i> NTE Limited Board Rule: NO 50/50!</span>
+            <span class="font-mono text-[11px] px-2 py-0.5 rounded bg-purple-500/20 text-purple-200">100% Featured S-Rank</span>
+          </div>
+          <p class="text-slate-300">Every S-Rank pulled on NTE's Limited Character Board is 100% guaranteed to be the featured character (90 hard pity, 70 soft pity). Bonus Outfit Perks unlock at <strong>50 / 120 / 200</strong> pulls:</p>
+          <div class="grid grid-cols-3 gap-2 pt-1 font-mono text-[11px]">
+            <div id="nte-mile-50" class="p-2 rounded-lg bg-slate-900/90 border border-slate-800 text-center">50 Pulls: Perk I</div>
+            <div id="nte-mile-120" class="p-2 rounded-lg bg-slate-900/90 border border-slate-800 text-center">120 Pulls: Perk II</div>
+            <div id="nte-mile-200" class="p-2 rounded-lg bg-slate-900/90 border border-slate-800 text-center">200 Pulls: Outfit</div>
+          </div>
+        </div>
+
+        <!-- Calculated Pity Breakdown Box -->
+        <div class="rounded-2xl bg-slate-900/90 border border-slate-800 p-4 space-y-3">
+          <div class="flex justify-between items-center text-xs">
+            <span id="pity-soft-label" class="text-slate-400">Soft Pity Starts (~65 pulls):</span>
+            <span id="pity-soft-needed" class="font-mono font-bold text-slate-200">0 pulls left</span>
+          </div>
+          <div class="flex justify-between items-center text-xs">
+            <span class="text-slate-400">Worst-Case Hard Pity Required:</span>
+            <span id="pity-hard-needed" class="font-mono font-bold text-amber-300">0 pulls</span>
+          </div>
+          <div class="flex justify-between items-center text-xs">
+            <span class="text-slate-400">Your Current Stash Equivalent:</span>
+            <span id="pity-stash-pulls" class="font-mono font-bold accent-text">0 pulls</span>
+          </div>
+          <div class="pt-3 border-t border-slate-800 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+            <div>
+              <div class="text-[11px] uppercase tracking-wider text-slate-400">Guarantee Status</div>
+              <div id="pity-status-text" class="text-sm font-bold text-emerald-400 mt-0.5">Calculating...</div>
+            </div>
+            <div class="sm:text-right">
+              <div class="text-[11px] uppercase tracking-wider text-slate-400">Est. Ready Date</div>
+              <div id="pity-eta-text" class="text-xs font-mono text-slate-200 mt-0.5">--</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right 6 cols: Dynamic Game Economy Reference -->
+      <div class="lg:col-span-6 glass-panel rounded-2xl p-5 sm:p-6 space-y-4">
+        <div>
+          <span id="codex-tag" class="text-[11px] font-mono uppercase tracking-wider px-2 py-0.5 rounded accent-bg-soft accent-text border">Solaris-3 Codex</span>
+          <h3 id="codex-title" class="text-lg font-bold text-white mt-1.5">Wuthering Waves Economy Reference</h3>
+          <p class="text-xs text-slate-400">Key conversion ratios, pity breakpoints, and recurring currency sources.</p>
+        </div>
+
+        <div id="codex-cards-grid" class="grid grid-cols-2 sm:grid-cols-3 gap-2.5 text-xs"></div>
+
+        <div class="overflow-hidden rounded-xl border border-slate-800">
+          <table class="w-full text-left text-xs">
+            <thead class="bg-slate-900/90 text-slate-400 uppercase text-[10px] tracking-wider border-b border-slate-800">
+              <tr>
+                <th class="py-2.5 px-3">Recurring Source</th>
+                <th class="py-2.5 px-3">Cadence</th>
+                <th class="py-2.5 px-3 text-right">Reward</th>
+              </tr>
+            </thead>
+            <tbody id="codex-sources-tbody" class="divide-y divide-slate-800/70 bg-slate-900/40"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+  </div>
+
+  <!-- ======================================================================= -->
+  <!-- SLIDE-OVER CUSTOMIZE STUDIO DRAWER                                      -->
+  <!-- ======================================================================= -->
+  <div id="customize-drawer" class="hidden fixed inset-0 z-50 bg-slate-950/75 backdrop-blur-sm flex justify-end">
+    <div class="glass-panel w-full max-w-md h-full overflow-y-auto p-6 drawer-animate border-l accent-border flex flex-col justify-between space-y-6">
+      <div class="space-y-6">
+        <!-- Drawer Header -->
+        <div class="flex items-center justify-between pb-4 border-b border-slate-800">
+          <div>
+            <span class="text-[10px] font-mono uppercase tracking-widest accent-text">Visual &amp; Media Studio</span>
+            <h3 class="text-lg font-bold text-white flex items-center gap-2">
+              <i class="fa-solid fa-sliders accent-text"></i> Customize Workspace
+            </h3>
+          </div>
+          <button onclick="closeCustomizeDrawer()" class="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white cursor-pointer">
+            <i class="fa-solid fa-xmark"></i>
+          </button>
+        </div>
+
+        <!-- 1. Custom Icons & Game Art Uploader for Active Game -->
+        <div class="space-y-3">
+          <div class="flex items-center justify-between">
+            <h4 class="text-xs font-bold uppercase tracking-wider text-slate-300">
+              Custom Icons &amp; Art (<span id="custom-game-name-label" class="accent-text">WuWa</span>)
+            </h4>
+            <button onclick="resetActiveGameMedia()" class="text-[11px] text-rose-300 hover:underline cursor-pointer">
+              Reset Icons
+            </button>
+          </div>
+          <p class="text-[11px] text-slate-400">Upload local PNG/JPG/WebP icons for your currency &amp; pull tickets. Images auto-compress so they stay saved safely.</p>
+
+          <div class="grid grid-cols-2 gap-2.5">
+            <!-- Primary Currency Icon -->
+            <div class="p-3 rounded-xl bg-slate-900/90 border border-slate-800 flex items-center justify-between gap-2">
+              <div class="flex items-center gap-2.5 min-w-0">
+                <div id="studio-preview-currency" class="w-8 h-8 rounded-lg bg-slate-800 flex items-center justify-center shrink-0 overflow-hidden"></div>
+                <div class="truncate">
+                  <div id="studio-label-currency" class="text-xs font-bold text-white truncate">Astrite</div>
+                  <div class="text-[10px] text-slate-400">Main Currency</div>
+                </div>
+              </div>
+              <label class="px-2 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-[11px] font-semibold text-slate-200 cursor-pointer shrink-0">
+                Upload
+                <input type="file" accept="image/*" class="hidden" onchange="handleCustomIconUpload(event, 'currency')" />
+              </label>
+            </div>
+
+            <!-- Limited Pull Icon -->
+            <div class="p-3 rounded-xl bg-slate-900/90 border border-slate-800 flex items-center justify-between gap-2">
+              <div class="flex items-center gap-2.5 min-w-0">
+                <div id="studio-preview-limited" class="w-8 h-8 rounded-lg bg-slate-800 flex items-center justify-center shrink-0 overflow-hidden"></div>
+                <div class="truncate">
+                  <div id="studio-label-limited" class="text-xs font-bold text-white truncate">Radiant Tide</div>
+                  <div class="text-[10px] text-slate-400">Limited Pull</div>
+                </div>
+              </div>
+              <label class="px-2 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-[11px] font-semibold text-slate-200 cursor-pointer shrink-0">
+                Upload
+                <input type="file" accept="image/*" class="hidden" onchange="handleCustomIconUpload(event, 'limitedTicket')" />
+              </label>
+            </div>
+
+            <!-- Weapon Pull Icon -->
+            <div class="p-3 rounded-xl bg-slate-900/90 border border-slate-800 flex items-center justify-between gap-2">
+              <div class="flex items-center gap-2.5 min-w-0">
+                <div id="studio-preview-weapon" class="w-8 h-8 rounded-lg bg-slate-800 flex items-center justify-center shrink-0 overflow-hidden"></div>
+                <div class="truncate">
+                  <div id="studio-label-weapon" class="text-xs font-bold text-white truncate">Forging Tide</div>
+                  <div class="text-[10px] text-slate-400">Weapon Pull</div>
+                </div>
+              </div>
+              <label class="px-2 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-[11px] font-semibold text-slate-200 cursor-pointer shrink-0">
+                Upload
+                <input type="file" accept="image/*" class="hidden" onchange="handleCustomIconUpload(event, 'weaponTicket')" />
+              </label>
+            </div>
+
+            <!-- Standard Pull Icon -->
+            <div class="p-3 rounded-xl bg-slate-900/90 border border-slate-800 flex items-center justify-between gap-2">
+              <div class="flex items-center gap-2.5 min-w-0">
+                <div id="studio-preview-standard" class="w-8 h-8 rounded-lg bg-slate-800 flex items-center justify-center shrink-0 overflow-hidden"></div>
+                <div class="truncate">
+                  <div id="studio-label-standard" class="text-xs font-bold text-white truncate">Lustrous Tide</div>
+                  <div class="text-[10px] text-slate-400">Standard Pull</div>
+                </div>
+              </div>
+              <label class="px-2 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-[11px] font-semibold text-slate-200 cursor-pointer shrink-0">
+                Upload
+                <input type="file" accept="image/*" class="hidden" onchange="handleCustomIconUpload(event, 'standardTicket')" />
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <!-- 1b. Website Design Style (Default Preserved + Research-Backed Styles) -->
+        <div class="space-y-2.5 pt-4 border-t border-slate-800">
+          <h4 class="text-xs font-bold uppercase tracking-wider text-slate-300">Website Layout &amp; Design Style</h4>
+          <div class="grid grid-cols-1 gap-2 text-xs">
+            <button type="button" onclick="setDesignStyle('tactical')" id="design-btn-tactical"
+              class="p-3 rounded-xl bg-slate-900/90 border border-slate-700 text-left cursor-pointer hover:border-teal-400 transition">
+              <div class="font-bold text-white flex items-center justify-between">
+                <span>Tactical Terminal (Default)</span>
+                <span class="text-[10px] font-mono accent-text">CLASSIC</span>
+              </div>
+              <p class="text-[11px] text-slate-400 mt-0.5">Your classic layout with subtle top-edge light polish &amp; hover lift.</p>
+            </button>
+
+            <button type="button" onclick="setDesignStyle('liquid')" id="design-btn-liquid"
+              class="p-3 rounded-xl bg-slate-900/90 border border-slate-700 text-left cursor-pointer hover:border-teal-400 transition">
+              <div class="font-bold text-white flex items-center justify-between">
+                <span>Liquid Glass Depth</span>
+                <span class="text-[10px] font-mono text-cyan-300">TRANSLUCENT</span>
+              </div>
+              <p class="text-[11px] text-slate-400 mt-0.5">Soft translucent glass surfaces, specular top highlights &amp; spring hover.</p>
+            </button>
+
+            <button type="button" onclick="setDesignStyle('editorial')" id="design-btn-editorial"
+              class="p-3 rounded-xl bg-slate-900/90 border border-slate-700 text-left cursor-pointer hover:border-teal-400 transition">
+              <div class="font-bold text-white flex items-center justify-between">
+                <span>Editorial Horizon</span>
+                <span class="text-[10px] font-mono text-amber-300">FADE-OUT</span>
+              </div>
+              <p class="text-[11px] text-slate-400 mt-0.5">Borderless atmospheric gradients that fade cleanly into the background.</p>
+            </button>
+          </div>
+        </div>
+
+        <!-- 2. Accent Color Presets & Custom Picker -->
+        <div class="space-y-3 pt-4 border-t border-slate-800">
+          <div class="flex items-center justify-between">
+            <h4 class="text-xs font-bold uppercase tracking-wider text-slate-300">Accent Color (Active Game)</h4>
+            <input type="color" id="custom-accent-picker" oninput="setGameAccentColor(this.value)" class="w-7 h-7 rounded cursor-pointer bg-transparent border-0" title="Pick any custom hex color" />
+          </div>
+          <div class="grid grid-cols-5 gap-2">
+            <button onclick="setGameAccentColor('#2dd4bf')" class="h-9 rounded-xl bg-[#2dd4bf] hover:scale-105 transition cursor-pointer border-2 border-white/20" title="Astrite Teal (WuWa Default)"></button>
+            <button onclick="setGameAccentColor('#a855f7')" class="h-9 rounded-xl bg-[#a855f7] hover:scale-105 transition cursor-pointer border-2 border-white/20" title="Eclipsia Violet (NTE Default)"></button>
+            <button onclick="setGameAccentColor('#f59e0b')" class="h-9 rounded-xl bg-[#f59e0b] hover:scale-105 transition cursor-pointer border-2 border-white/20" title="Solaris Gold"></button>
+            <button onclick="setGameAccentColor('#f43f5e')" class="h-9 rounded-xl bg-[#f43f5e] hover:scale-105 transition cursor-pointer border-2 border-white/20" title="Crimson Havoc"></button>
+            <button onclick="setGameAccentColor('#38bdf8')" class="h-9 rounded-xl bg-[#38bdf8] hover:scale-105 transition cursor-pointer border-2 border-white/20" title="Glacio Sky"></button>
+          </div>
+        </div>
+
+        <!-- 3. Background Atmosphere Theme -->
+        <div class="space-y-3 pt-4 border-t border-slate-800">
+          <h4 class="text-xs font-bold uppercase tracking-wider text-slate-300">Background Theme</h4>
+          <div class="grid grid-cols-2 gap-2 text-xs">
+            <button onclick="setThemePreset('midnight')" id="theme-btn-midnight" class="p-2.5 rounded-xl bg-[#0b0f19] border border-slate-700 text-slate-200 font-semibold text-left cursor-pointer hover:border-teal-400">
+              <span class="inline-block w-2.5 h-2.5 rounded-full bg-[#1e293b] mr-1.5"></span> Midnight Slate (Default)
+            </button>
+            <button onclick="setThemePreset('amoled')" id="theme-btn-amoled" class="p-2.5 rounded-xl bg-[#040508] border border-slate-800 text-slate-200 font-semibold text-left cursor-pointer hover:border-teal-400">
+              <span class="inline-block w-2.5 h-2.5 rounded-full bg-black border border-slate-600 mr-1.5"></span> Obsidian AMOLED
+            </button>
+            <button onclick="setThemePreset('twilight')" id="theme-btn-twilight" class="p-2.5 rounded-xl bg-[#131126] border border-purple-900/60 text-slate-200 font-semibold text-left cursor-pointer hover:border-purple-400">
+              <span class="inline-block w-2.5 h-2.5 rounded-full bg-purple-500 mr-1.5"></span> Hethereau Twilight
+            </button>
+            <button onclick="setThemePreset('daylight')" id="theme-btn-daylight" class="p-2.5 rounded-xl bg-slate-100 border border-slate-300 text-slate-900 font-semibold text-left cursor-pointer hover:border-teal-500">
+              <span class="inline-block w-2.5 h-2.5 rounded-full bg-amber-400 mr-1.5"></span> Soft Daylight
+            </button>
+          </div>
+        </div>
+
+        <!-- 4. Surface & Layout Toggles -->
+        <div class="space-y-3 pt-4 border-t border-slate-800 text-xs">
+          <h4 class="text-xs font-bold uppercase tracking-wider text-slate-300">Surface &amp; Grid Options</h4>
+          <label class="flex items-center justify-between p-2.5 rounded-xl bg-slate-900/80 border border-slate-800 cursor-pointer">
+            <span class="text-slate-200 font-medium">Tactical Background Grid</span>
+            <input type="checkbox" id="toggle-grid" checked onchange="toggleVisualOption('showGrid', this.checked)" class="accent-teal-400 w-4 h-4" />
+          </label>
+          <label class="flex items-center justify-between p-2.5 rounded-xl bg-slate-900/80 border border-slate-800 cursor-pointer">
+            <span class="text-slate-200 font-medium">Glassmorphism Blur Panels</span>
+            <input type="checkbox" id="toggle-glass" checked onchange="toggleVisualOption('glassBlur', this.checked)" class="accent-teal-400 w-4 h-4" />
+          </label>
+          <label class="flex items-center justify-between p-2.5 rounded-xl bg-slate-900/80 border border-slate-800 cursor-pointer">
+            <span class="text-slate-200 font-medium">Compact Card Density</span>
+            <input type="checkbox" id="toggle-compact" onchange="toggleVisualOption('compactMode', this.checked)" class="accent-teal-400 w-4 h-4" />
+          </label>
+        </div>
+      </div>
+
+      <!-- Footer: One-Click Reset to Default Dark -->
+      <div class="pt-4 border-t border-slate-800">
+        <button onclick="resetToDefaultDark()" class="w-full py-2.5 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-600 text-xs font-bold text-white transition cursor-pointer flex items-center justify-center gap-2">
+          <i class="fa-solid fa-rotate-left text-amber-400"></i> Reset Theme to Default Dark
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ======================================================================= -->
+  <!-- MODAL 1: LOG / EDIT DAILY CURRENCY                                      -->
+  <!-- ======================================================================= -->
+  <div id="daily-modal" class="hidden fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="glass-panel rounded-2xl w-full max-w-md p-6 modal-animate border accent-border">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-800">
+        <h3 id="daily-modal-title" class="text-lg font-bold text-white flex items-center gap-2">
+          <span id="modal-daily-icon-slot" class="w-6 h-6 inline-flex items-center justify-center"></span>
+          <span id="modal-daily-heading">Log Daily Astrite Balance</span>
+        </h3>
+        <button onclick="closeDailyModal()" class="text-slate-400 hover:text-white cursor-pointer p-1">
+          <i class="fa-solid fa-xmark text-lg"></i>
+        </button>
+      </div>
+      <form id="daily-form" onsubmit="saveDailyEntry(event)" class="space-y-4 mt-4">
+        <input type="hidden" id="daily-edit-id" />
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-semibold text-slate-300 mb-1">Date</label>
+            <input id="daily-date" type="date" required
+              class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm font-mono text-white focus:outline-none" />
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-300 mb-1">Patch Version</label>
+            <input id="daily-patch" type="text" required
+              class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm font-mono accent-text focus:outline-none" />
+          </div>
+        </div>
+
+        <div>
+          <label id="daily-currency-input-label" class="block text-xs font-semibold text-slate-300 mb-1">Total Astrite Owned Right Now</label>
+          <input id="daily-astrite" type="number" min="0" step="1" required placeholder="e.g., 14850"
+            class="w-full bg-slate-900 border accent-border rounded-xl px-3.5 py-2.5 text-lg font-mono font-bold accent-text focus:outline-none" />
+        </div>
+
+        <div class="grid grid-cols-3 gap-2.5">
+          <div>
+            <label id="daily-limited-label" class="block text-[11px] font-semibold text-amber-300 mb-1 truncate">Radiant Tides</label>
+            <input id="daily-radiant" type="number" min="0" value="0"
+              class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm font-mono text-white focus:outline-none" />
+          </div>
+          <div>
+            <label id="daily-weapon-label" class="block text-[11px] font-semibold text-cyan-300 mb-1 truncate">Forging Tides</label>
+            <input id="daily-forging" type="number" min="0" value="0"
+              class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm font-mono text-white focus:outline-none" />
+          </div>
+          <div>
+            <label id="daily-standard-label" class="block text-[11px] font-semibold text-slate-300 mb-1 truncate">Lustrous Tides</label>
+            <input id="daily-lustrous" type="number" min="0" value="0"
+              class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm font-mono text-white focus:outline-none" />
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-300 mb-1">Note (Optional)</label>
+          <input id="daily-note" type="text" placeholder="e.g., Dailies + Endgame Rotation Clear"
+            class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none" />
+        </div>
+
+        <div class="flex justify-end gap-2 pt-2">
+          <button type="button" onclick="closeDailyModal()" class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold cursor-pointer">Cancel</button>
+          <button type="submit" class="px-5 py-2 rounded-xl accent-bg hover:opacity-90 text-slate-950 text-xs font-bold cursor-pointer">
+            Save Entry
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ======================================================================= -->
+  <!-- MODAL 2: ADD / EDIT PATCH EVENT (WITH EVENT IMAGE UPLOAD)               -->
+  <!-- ======================================================================= -->
+  <div id="event-modal" class="hidden fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="glass-panel rounded-2xl w-full max-w-md p-6 modal-animate border border-amber-400/30 max-h-[92vh] overflow-y-auto">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-800">
+        <h3 id="event-modal-title" class="text-lg font-bold text-white flex items-center gap-2">
+          <i class="fa-solid fa-calendar-plus text-amber-400"></i> Add Patch Event
+        </h3>
+        <button onclick="closeEventModal()" class="text-slate-400 hover:text-white cursor-pointer p-1">
+          <i class="fa-solid fa-xmark text-lg"></i>
+        </button>
+      </div>
+      <form id="event-form" onsubmit="saveEventEntry(event)" class="space-y-4 mt-4">
+        <input type="hidden" id="event-edit-id" />
+
+        <!-- Event Image Upload & Interactive Twitter/X-Style Drag + Zoom Editor -->
+        <div class="space-y-2">
+          <div class="flex items-center justify-between">
+            <label class="block text-xs font-semibold text-slate-300">Event Banner Image (Optional)</label>
+            <label class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-[11px] font-semibold text-white cursor-pointer transition">
+              <i class="fa-solid fa-upload mr-1 text-amber-400"></i> <span id="event-choose-img-label">Choose Image</span>
+              <input type="file" accept="image/*" class="hidden" onchange="handleEventModalImageSelect(event)" />
+            </label>
+          </div>
+
+          <div id="event-banner-stage" class="relative w-full h-36 rounded-xl bg-slate-900 border border-dashed border-slate-700 overflow-hidden flex items-center justify-center">
+            <img id="event-image-preview" src="" alt="Event Preview" draggable="false"
+              class="hidden w-full h-full object-cover select-none pointer-events-none"
+              style="object-position: 50% 35%; transform: scale(1); transform-origin: 50% 35%;" />
+            <div id="event-image-placeholder" class="text-center px-3 pointer-events-none">
+              <i class="fa-regular fa-image text-slate-500 text-lg"></i>
+              <p class="text-[11px] text-slate-400 mt-1">Click <strong>Choose Image</strong> above to upload event art</p>
+            </div>
+            <div id="event-drag-hint" class="hidden absolute bottom-2 left-2 px-2 py-0.5 rounded-md bg-slate-950/80 backdrop-blur-sm border border-white/10 text-[10px] text-slate-200 pointer-events-none">
+              <i class="fa-solid fa-up-down-left-right mr-1 accent-text"></i> Drag image to reposition
+            </div>
+            <button type="button" id="event-image-clear-btn" onclick="clearEventModalImage()" class="hidden absolute top-2 right-2 z-10 px-2 py-1 rounded-lg bg-rose-950/90 hover:bg-rose-900 border border-rose-400/40 text-[10px] text-rose-200 cursor-pointer">
+              Remove
+            </button>
+          </div>
+
+          <!-- Twitter-style Zoom & Banner Height Controls -->
+          <div id="event-image-position-controls" class="hidden p-2.5 rounded-xl bg-slate-900/90 border border-slate-800 space-y-2.5 text-[11px]">
+            <div class="flex items-center gap-3">
+              <i class="fa-solid fa-magnifying-glass-minus text-slate-400"></i>
+              <input id="event-img-zoom" type="range" min="100" max="220" value="100" oninput="updateEventImageTransform()" class="flex-1 accent-teal-400 cursor-pointer" />
+              <i class="fa-solid fa-magnifying-glass-plus text-slate-400"></i>
+              <span id="event-img-zoom-val" class="font-mono accent-text w-10 text-right">100%</span>
+            </div>
+            <div class="flex items-center justify-between gap-2 pt-1 border-t border-slate-800/80">
+              <span class="text-slate-400">Banner Height:</span>
+              <div class="inline-flex rounded-lg bg-slate-950/80 p-0.5 border border-slate-800">
+                <button type="button" onclick="setEventBannerHeight('sm')" id="ev-h-sm" class="ev-h-btn px-2 py-0.5 rounded-md text-[10px] font-semibold text-slate-400 cursor-pointer">Compact</button>
+                <button type="button" onclick="setEventBannerHeight('md')" id="ev-h-md" class="ev-h-btn px-2 py-0.5 rounded-md text-[10px] font-semibold accent-bg-soft accent-text cursor-pointer">Standard</button>
+                <button type="button" onclick="setEventBannerHeight('lg')" id="ev-h-lg" class="ev-h-btn px-2 py-0.5 rounded-md text-[10px] font-semibold text-slate-400 cursor-pointer">Tall</button>
+              </div>
+              <button type="button" onclick="resetEventImageFraming()" class="text-[10px] text-slate-400 hover:text-white underline cursor-pointer">Reset</button>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-300 mb-1">Event Name</label>
+          <input id="event-name" type="text" required placeholder="e.g., Flagship Event / Endgame Rotation"
+            class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none" />
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <div class="flex items-center justify-between mb-1">
+              <label class="block text-xs font-semibold text-slate-300">Event Type</label>
+              <button type="button" onclick="toggleNewCategoryBox()" class="text-[11px] font-bold accent-text hover:underline cursor-pointer">
+                <i class="fa-solid fa-plus"></i> New Type
+              </button>
+            </div>
+            <select id="event-category"
+              class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none">
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-300 mb-1">Patch Tag</label>
+            <input id="event-patch" type="text" required
+              class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs font-mono accent-text focus:outline-none" />
+          </div>
+        </div>
+
+        <!-- Inline Custom Event Type Creator & Removable Tag Manager -->
+        <div id="new-category-box" class="hidden p-2.5 rounded-xl bg-slate-900/95 border accent-border space-y-2">
+          <div class="flex items-center gap-2">
+            <input id="new-category-input" type="text" placeholder="e.g., Co-op Raid / Story Quest"
+              onkeydown="if(event.key==='Enter'){event.preventDefault();saveNewEventCategory();}"
+              class="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none" />
+            <button type="button" onclick="saveNewEventCategory()" class="px-3 py-1.5 rounded-lg accent-bg text-slate-950 text-xs font-bold cursor-pointer">
+              Add
+            </button>
+            <button type="button" onclick="toggleNewCategoryBox(false)" class="px-2 py-1.5 rounded-lg bg-slate-800 text-slate-400 hover:text-white text-xs cursor-pointer">
+              <i class="fa-solid fa-xmark"></i>
+            </button>
+          </div>
+          <div id="custom-category-chips" class="flex flex-wrap gap-1.5"></div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-semibold text-slate-300 mb-1">Start Date</label>
+            <input id="event-start" type="date" required
+              class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs font-mono text-white focus:outline-none" />
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-300 mb-1">End Date</label>
+            <input id="event-end" type="date" required
+              class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs font-mono text-white focus:outline-none" />
+          </div>
+        </div>
+
+        <label class="flex items-center justify-between p-2.5 rounded-xl bg-slate-900/90 border border-slate-800 cursor-pointer text-xs">
+          <div>
+            <span class="font-semibold text-slate-200 flex items-center gap-1.5">
+              <i class="fa-solid fa-arrows-rotate text-cyan-400"></i> Recurring / Patch-Reset Event
+            </span>
+            <p class="text-[11px] text-slate-400 mt-0.5">Auto-clones with 0 claimed when archiving a patch (e.g., Hunter Exchange, Endgame).</p>
+          </div>
+          <input id="event-is-recurring" type="checkbox" class="accent-teal-400 w-4 h-4 shrink-0 ml-2" />
+        </label>
+
+        <div class="space-y-2">
+          <div class="flex items-center justify-between">
+            <label class="block text-xs font-semibold text-amber-300">Event Rewards (Currency &amp; Pulls)</label>
+            <button type="button" onclick="addEventRewardRow()" class="px-2.5 py-1 rounded-lg accent-bg-soft border text-[11px] font-bold accent-text hover:opacity-90 cursor-pointer">
+              <i class="fa-solid fa-plus mr-1"></i> Add Reward
+            </button>
+          </div>
+          <div id="event-rewards-list" class="space-y-2"></div>
+        </div>
+
+        <div class="flex justify-end gap-2 pt-2">
+          <button type="button" onclick="closeEventModal()" class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold cursor-pointer">Cancel</button>
+          <button type="submit" class="px-5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-bold cursor-pointer">
+            Save Event
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ======================================================================= -->
+  <!-- MODAL 3: QUICK UPDATE CLAIMED CURRENCY ON AN EVENT                      -->
+  <!-- ======================================================================= -->
+  <div id="quick-claim-modal" class="hidden fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="glass-panel rounded-2xl w-full max-w-sm p-6 modal-animate border accent-border">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-800">
+        <h3 class="text-base font-bold text-white">Update Claimed Reward</h3>
+        <button onclick="closeQuickClaimModal()" class="text-slate-400 hover:text-white cursor-pointer p-1">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+      <form onsubmit="submitQuickClaim(event)" class="space-y-4 mt-4">
+        <input type="hidden" id="quick-claim-event-id" />
+        <div>
+          <div id="quick-claim-event-name" class="text-sm font-bold accent-text">Event Name</div>
+          <div id="quick-claim-event-max" class="text-xs text-slate-400 font-mono mt-0.5">Max Reward: 0</div>
+        </div>
+        <div id="quick-claim-rows" class="space-y-2.5"></div>
+        <div class="flex justify-end gap-2 pt-1">
+          <button type="button" onclick="closeQuickClaimModal()" class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold cursor-pointer">Cancel</button>
+          <button type="submit" class="px-4 py-2 rounded-xl accent-bg hover:opacity-90 text-slate-950 text-xs font-bold cursor-pointer">Update</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ======================================================================= -->
+  <!-- MODAL 4: ARCHIVE PATCH EVENTS / RESET FOR NEW PATCH                     -->
+  <!-- ======================================================================= -->
+  <div id="archive-modal" class="hidden fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="glass-panel rounded-2xl w-full max-w-md p-6 modal-animate border border-amber-400/40">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-800">
+        <h3 class="text-lg font-bold text-white flex items-center gap-2">
+          <i class="fa-solid fa-box-archive text-amber-400"></i> Archive Patch Events
+        </h3>
+        <button onclick="closeArchiveConfirmModal()" class="text-slate-400 hover:text-white cursor-pointer p-1">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+      <div class="space-y-4 mt-4 text-xs sm:text-sm text-slate-300">
+        <p>Moving events to the <strong>Permanent Event Archive Vault</strong> preserves every reward and event image forever, while clearing your Active Events board for the next patch.</p>
+        <div class="p-3.5 rounded-xl bg-slate-900/90 border border-slate-800 space-y-2">
+          <label class="flex items-center gap-2.5 cursor-pointer">
+            <input type="radio" name="archiveMode" value="all" checked class="accent-teal-400" />
+            <span><strong>Archive ALL Active Events</strong> (Full New Patch Reset)</span>
+          </label>
+          <label class="flex items-center gap-2.5 cursor-pointer">
+            <input type="radio" name="archiveMode" value="completed" class="accent-teal-400" />
+            <span><strong>Archive Only 100% Completed Events</strong></span>
+          </label>
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-slate-400 mb-1">Optional: Set Next Patch Version Immediately</label>
+          <input id="archive-next-patch" type="text" placeholder="Leave blank to keep current, or type e.g. Patch 4.0"
+            class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs font-mono accent-text focus:outline-none" />
+        </div>
+        <div class="flex justify-end gap-2 pt-2">
+          <button type="button" onclick="closeArchiveConfirmModal()" class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold cursor-pointer">Cancel</button>
+          <button type="button" onclick="executeArchiveEvents()" class="px-5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-bold cursor-pointer">
+            Move to Archive Vault
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/app.js"></script>
+</body>
+</html>
