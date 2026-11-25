@@ -623,8 +623,20 @@ function initHeroBannerDragCrop() {
     const pt = e.touches ? e.touches[0] : e;
     const rect = activeDragBox.getBoundingClientRect();
     const zoomFactor = Math.max(1, (profile.media.heroZoom ?? 100) / 100);
-    const dx = (((pt.clientX - startX) / Math.max(1, rect.width)) * 100) / zoomFactor;
-    const dy = (((pt.clientY - startY) / Math.max(1, rect.height)) * 100) / zoomFactor;
+    // How far the image can actually slide inside the frame on each axis (in px). Dragging by that many px
+    // moves the position from 0% to 100%, so the picture follows the cursor 1:1 in whichever box you drag.
+    const mainImg = document.getElementById('hero-banner-img');
+    const nw = mainImg?.naturalWidth || 0;
+    const nh = mainImg?.naturalHeight || 0;
+    let rangeX = rect.width;
+    let rangeY = rect.height;
+    if (nw && nh) {
+      const fit = Math.max(rect.width / nw, rect.height / nh);
+      rangeX = zoomFactor * nw * fit - rect.width;
+      rangeY = zoomFactor * nh * fit - rect.height;
+    }
+    const dx = rangeX > 2 ? ((pt.clientX - startX) / rangeX) * 100 : 0;
+    const dy = rangeY > 2 ? ((pt.clientY - startY) / rangeY) * 100 : 0;
     profile.media.heroPosX = Math.max(0, Math.min(100, Math.round(originX - dx)));
     profile.media.heroFocusY = Math.max(0, Math.min(100, Math.round(originY - dy)));
     applyHeroTransformToElements(profile.media.heroPosX, profile.media.heroFocusY, profile.media.heroZoom ?? 100);
@@ -717,6 +729,24 @@ function renderHeroBanner() {
   }
   document.getElementById('hero-drag-hint')?.classList.toggle('hidden', !(heroEditorOpen && Boolean(profile.media.heroBanner)));
   container?.classList.toggle('banner-crop-stage', heroEditorOpen && Boolean(profile.media.heroBanner));
+  syncHeroPreviewAspect();
+}
+
+// Heights (px) of the real banner for the Compact / Standard / Tall options at <640, >=640 and >=768 px wide.
+const HERO_BANNER_HEIGHTS = { sm: [144, 176, 192], md: [176, 224, 256], lg: [224, 288, 320] };
+
+// Makes the editor preview the exact same shape as the real banner, so what you frame is what you get.
+function syncHeroPreviewAspect() {
+  const container = document.getElementById('hero-banner-container');
+  const preview = document.getElementById('hero-modal-preview');
+  if (!container || !preview) return;
+  const profile = getActiveProfile();
+  const sz = HERO_BANNER_HEIGHTS[profile.media.heroSize] ? profile.media.heroSize : 'md';
+  const w = window.innerWidth;
+  const tier = w >= 768 ? 2 : (w >= 640 ? 1 : 0);
+  const bannerW = container.clientWidth || 1;
+  const bannerH = HERO_BANNER_HEIGHTS[sz][tier];
+  preview.style.aspectRatio = `${bannerW} / ${bannerH}`;
 }
 
 // =========================================================================
@@ -1619,29 +1649,6 @@ function clearEventModalImage() {
   setEventModalPreview(null, 50, 35, 100, 'md');
 }
 
-async function quickUploadEventCardImage(event, eventId) {
-  const file = event.target.files?.[0];
-  if (!file) return;
-  try {
-    const compressed = await compressImageFile(file, 720, 340, 0.84);
-    const profile = getActiveProfile();
-    const idx = profile.activeEvents.findIndex(e => e.id === eventId);
-    if (idx !== -1) {
-      profile.activeEvents[idx].image = compressed;
-      profile.activeEvents[idx].imagePosX = 50;
-      profile.activeEvents[idx].imagePosY = 35;
-      profile.activeEvents[idx].imageZoom = 100;
-      profile.activeEvents[idx].imageHeight = profile.activeEvents[idx].imageHeight || 'md';
-      saveState();
-      renderActiveEvents();
-      showToast('Event banner updated! Click Edit to drag & zoom.', 'success');
-    }
-  } catch (err) {
-    showToast(err.message || 'Image upload failed.', 'error');
-  }
-  event.target.value = '';
-}
-
 function addEventRewardRow(reward = { type: 'currency', total: '', claimed: 0 }) {
   const container = document.getElementById('event-rewards-list');
   const row = document.createElement('div');
@@ -1954,10 +1961,6 @@ function renderActiveEvents() {
            </div>
            <div class="absolute top-2.5 right-2.5 flex items-center gap-1">
              ${timeBadge}
-             <label title="Change Event Image" class="p-1.5 rounded-lg bg-slate-950/80 hover:bg-slate-900 text-slate-200 cursor-pointer border border-white/10">
-               <i class="fa-solid fa-camera text-[10px]"></i>
-               <input type="file" accept="image/*" class="hidden" onchange="quickUploadEventCardImage(event, '${ev.id}')" />
-             </label>
            </div>
          </div>`
       : `<div class="px-4 pt-3.5 flex items-center justify-between gap-2">
@@ -1969,10 +1972,6 @@ function renderActiveEvents() {
            </div>
            <div class="flex items-center gap-1.5">
              ${timeBadge}
-             <label title="Upload Event Banner Image" class="p-1.5 rounded-lg bg-slate-800/90 hover:bg-slate-700 text-slate-300 hover:text-white cursor-pointer border border-slate-700">
-               <i class="fa-regular fa-image text-xs"></i>
-               <input type="file" accept="image/*" class="hidden" onchange="quickUploadEventCardImage(event, '${ev.id}')" />
-             </label>
            </div>
          </div>`;
 
@@ -2124,6 +2123,53 @@ function deleteArchivedEvent(id) {
   showToast('Removed entry from archive.', 'info');
 }
 
+// Archive sorting: click a header to sort ascending, click again for descending, a third click restores creation order.
+let archiveSort = { key: null, dir: 'asc' };
+
+function setArchiveSort(key) {
+  if (archiveSort.key !== key) {
+    archiveSort = { key, dir: 'asc' };
+  } else if (archiveSort.dir === 'asc') {
+    archiveSort.dir = 'desc';
+  } else {
+    archiveSort = { key: null, dir: 'asc' };
+  }
+  renderArchiveTable();
+}
+
+function updateArchiveSortHeaders() {
+  [['category', 'th-archive-category', 'Category'], ['duration', 'th-archive-duration', 'Duration']].forEach(([key, id, label]) => {
+    const th = document.getElementById(id);
+    if (!th) return;
+    const active = archiveSort.key === key;
+    const arrow = active
+      ? `<i class="fa-solid fa-caret-${archiveSort.dir === 'asc' ? 'up' : 'down'} ml-1 accent-text"></i>`
+      : '';
+    th.innerHTML = `${label}${arrow}`;
+    th.classList.toggle('text-white', active);
+    th.setAttribute('aria-sort', active ? (archiveSort.dir === 'asc' ? 'ascending' : 'descending') : 'none');
+  });
+}
+
+function sortArchiveEvents(list) {
+  const indexed = list.map((ev, idx) => ({ ev, idx }));
+  if (archiveSort.key) {
+    const dir = archiveSort.dir === 'asc' ? 1 : -1;
+    indexed.sort((a, b) => {
+      let cmp = 0;
+      if (archiveSort.key === 'category') {
+        cmp = String(a.ev.category || '').localeCompare(String(b.ev.category || ''), undefined, { sensitivity: 'base' });
+      } else {
+        // Duration column sorts by when the event started (then ends)
+        cmp = String(a.ev.startDate || '').localeCompare(String(b.ev.startDate || ''))
+          || String(a.ev.endDate || '').localeCompare(String(b.ev.endDate || ''));
+      }
+      return cmp !== 0 ? cmp * dir : a.idx - b.idx;
+    });
+  }
+  return indexed.map(x => x.ev);
+}
+
 function renderArchiveTable() {
   const profile = getActiveProfile();
   const filterSelect = document.getElementById('archive-patch-filter');
@@ -2150,9 +2196,10 @@ function renderArchiveTable() {
       </span>
     `).join('');
 
-  const filtered = currentFilter === 'ALL'
+  const filtered = sortArchiveEvents(currentFilter === 'ALL'
     ? profile.archivedEvents
-    : profile.archivedEvents.filter(e => e.patch === currentFilter);
+    : profile.archivedEvents.filter(e => e.patch === currentFilter));
+  updateArchiveSortHeaders();
 
   const tbody = document.getElementById('archive-table-body');
   if (filtered.length === 0) {
@@ -2640,6 +2687,7 @@ document.addEventListener('click', (e) => {
   }
 });
 window.addEventListener('resize', closeAllPopovers);
+window.addEventListener('resize', syncHeroPreviewAspect);
 
 window.addEventListener('DOMContentLoaded', () => {
   loadState();
