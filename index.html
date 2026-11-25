@@ -40,7 +40,7 @@
   </div>
 
   <div id="hero-editor-modal" class="hidden fixed inset-0 z-[90] flex items-center justify-center p-4 bg-slate-950/75 backdrop-blur-md" onclick="if(event.target===this) closeHeroEditorModal()">
-  <div class="w-full max-w-lg rounded-2xl bg-slate-950 border accent-border shadow-2xl p-5 space-y-4 text-xs" onclick="event.stopPropagation()">
+  <div class="w-full max-w-2xl rounded-2xl bg-slate-950 border accent-border shadow-2xl p-5 space-y-4 text-xs" onclick="event.stopPropagation()">
     <div class="flex items-center justify-between border-b border-slate-800 pb-3">
       <span class="font-bold text-sm text-white flex items-center gap-2">
         <i class="fa-solid fa-crop-simple accent-text"></i> Customize Showcase Banner
@@ -51,10 +51,10 @@
     </div>
 
     <!-- Interactive Drag Preview Viewport -->
-    <div id="hero-modal-preview" class="relative w-full h-40 rounded-xl overflow-hidden bg-slate-900 border border-slate-800 cursor-grab active:cursor-grabbing select-none touch-none">
+    <div id="hero-modal-preview" style="aspect-ratio: 16 / 5;" class="relative w-full rounded-xl overflow-hidden bg-slate-900 border border-slate-800 cursor-grab active:cursor-grabbing select-none touch-none">
       <img id="hero-modal-preview-img" src="" alt="Banner Preview" draggable="false" class="w-full h-full object-cover pointer-events-none transition-none" />
       <div class="absolute bottom-2 left-2 px-2 py-0.5 rounded bg-black/70 text-[10px] text-slate-300 pointer-events-none">
-        <i class="fa-solid fa-up-down-left-right mr-1 accent-text"></i> Drag inside preview to reposition
+        <i class="fa-solid fa-up-down-left-right mr-1 accent-text"></i> Preview matches the real banner &middot; drag to reposition
       </div>
     </div>
 
@@ -424,8 +424,8 @@
               <tr class="bg-slate-900/90 text-slate-400 uppercase text-[11px] tracking-wider border-b border-slate-800">
                 <th class="py-3 px-4">Patch</th>
                 <th class="py-3 px-4">Event</th>
-                <th class="py-3 px-4">Category</th>
-                <th class="py-3 px-4">Duration</th>
+                <th id="th-archive-category" onclick="setArchiveSort('category')" class="py-3 px-4 cursor-pointer select-none hover:text-white transition" title="Click to sort by category">Category</th>
+                <th id="th-archive-duration" onclick="setArchiveSort('duration')" class="py-3 px-4 cursor-pointer select-none hover:text-white transition" title="Click to sort by start date">Duration</th>
                 <th class="py-3 px-4 text-right">Claimed / Max</th>
                 <th class="py-3 px-4 text-right">Action</th>
               </tr>
